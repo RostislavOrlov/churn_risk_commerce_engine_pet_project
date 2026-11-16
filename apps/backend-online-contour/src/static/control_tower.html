@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Control Tower — HTTP REST & WebSocket Console</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #020617; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; line-height: 1.5; }
+    .max-w-\[1600px\] { max-width: 1500px; margin: 0 auto; }
+    .space-y-6 > * + * { margin-top: 24px; }
+    .space-y-5 > * + * { margin-top: 20px; }
+    .space-y-4 > * + * { margin-top: 16px; }
+    .space-y-3 > * + * { margin-top: 12px; }
+    .space-y-2 > * + * { margin-top: 8px; }
+    .flex { display: flex; }
+    .flex-wrap { flex-wrap: wrap; }
+    .flex-col { flex-direction: column; }
+    .flex-1 { flex: 1; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-2 { gap: 8px; }
+    .gap-3 { gap: 12px; }
+    .gap-4 { gap: 16px; }
+    .gap-6 { gap: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (min-width: 1200px) {
+      .xl\:grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+      .xl\:col-span-7 { grid-column: span 7 / span 7; }
+      .xl\:col-span-5 { grid-column: span 5 / span 5; }
+    }
+    .bg-slate-900\/50 { background: rgba(15, 23, 42, 0.7); }
+    .bg-slate-900 { background: #0f172a; }
+    .bg-slate-950 { background: #020617; }
+    .bg-slate-800 { background: #1e293b; }
+    .border { border: 1px solid #1e293b; }
+    .border-b { border-bottom: 1px solid #1e293b; }
+    .border-sky-900\/40 { border-color: rgba(12, 74, 110, 0.6); }
+    .border-emerald-900\/40 { border-color: rgba(6, 78, 59, 0.6); }
+    .rounded-2xl { border-radius: 16px; }
+    .rounded-xl { border-radius: 12px; }
+    .rounded-lg { border-radius: 8px; }
+    .rounded-full { border-radius: 9999px; }
+    .p-6 { padding: 24px; }
+    .p-5 { padding: 20px; }
+    .p-4 { padding: 16px; }
+    .p-3 { padding: 12px; }
+    .p-2\.5 { padding: 10px; }
+    .p-2 { padding: 8px; }
+    .pb-4 { padding-bottom: 16px; }
+    .pb-3 { padding-bottom: 12px; }
+    .px-3 { padding-left: 12px; padding-right: 12px; }
+    .py-2 { padding-top: 8px; padding-bottom: 8px; }
+    .text-2xl { font-size: 1.5rem; }
+    .text-lg { font-size: 1.125rem; }
+    .text-sm { font-size: 0.875rem; }
+    .text-xs { font-size: 0.75rem; }
+    .font-bold { font-weight: 700; }
+    .font-semibold { font-weight: 600; }
+    .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .text-white { color: #ffffff; }
+    .text-slate-300 { color: #cbd5e1; }
+    .text-slate-400 { color: #94a3b8; }
+    .text-slate-500 { color: #64748b; }
+    .text-sky-300, .text-sky-400 { color: #38bdf8; }
+    .text-emerald-200, .text-emerald-300, .text-emerald-400 { color: #34d399; }
+    .text-purple-200, .text-purple-400 { color: #c084fc; }
+    .text-amber-300, .text-amber-400 { color: #fbbf24; }
+    .text-rose-300, .text-rose-400 { color: #fb7185; }
+    input { color: #f8fafc; outline: none; width: 100%; }
+    input:focus { border-color: #38bdf8; }
+    button { cursor: pointer; border: none; color: #fff; font-weight: 600; }
+    .bg-sky-600 { background: #0284c7; } .bg-sky-600:hover { background: #0ea5e9; }
+    .bg-indigo-600 { background: #4f46e5; } .bg-indigo-600:hover { background: #6366f1; }
+    .bg-purple-600 { background: #9333ea; } .bg-purple-600:hover { background: #a855f7; }
+    .bg-fuchsia-700 { background: #a21caf; } .bg-fuchsia-700:hover { background: #c026d3; }
+    .bg-slate-700 { background: #334155; } .bg-slate-700:hover { background: #475569; }
+    .bg-amber-600 { background: #d97706; } .bg-amber-600:hover { background: #f59e0b; }
+    .bg-emerald-700 { background: #047857; } .bg-emerald-700:hover { background: #059669; }
+    .bg-rose-800 { background: #9f1239; } .bg-rose-800:hover { background: #be123c; }
+    .bg-sky-500\/20 { background: rgba(14, 165, 233, 0.15); }
+    .bg-emerald-500\/20 { background: rgba(16, 185, 129, 0.15); }
+    .bg-amber-500\/20 { background: rgba(245, 158, 11, 0.15); }
+    .bg-rose-500\/20 { background: rgba(244, 63, 94, 0.15); }
+    pre { white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #1e293b; text-align: left; }
+    .overflow-y-auto { overflow-y: auto; max-height: 210px; }
+  </style>
+
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-6 font-sans">
+  <div class="max-w-[1600px] mx-auto space-y-6">
+    <div class="flex flex-wrap items-center justify-between border-b border-slate-800 pb-4 gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-white">Real-Time Commerce & Logistics Control Tower</h1>
+        <p class="text-sm text-slate-400">HTTP REST API (слева) и WebSocket Live Stream (справа)</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl p-2"><input id="auth-u" value="dispatcher_ivanov" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs" style="width:130px"/><input id="auth-p" type="password" value="password123" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs" style="width:110px"/><button onclick="doLogin(false)" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1 rounded-lg text-xs">Войти</button></div><span id="auth-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">AUTH: ...</span>
+        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+          HTTP REST v1: READY
+        </span>
+        <span id="ws-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          WS: CONNECTING...
+        </span>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      <div class="xl:col-span-7 space-y-5 bg-slate-900/50 border border-sky-900/40 rounded-2xl p-5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="text-lg font-bold text-sky-400">1. HTTP REST API Контур</h2>
+          <span class="text-xs font-mono text-slate-400">/api/v1/*</span>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex justify-between items-center">
+            <span class="text-sm font-semibold text-white">Customer & ML Retention</span>
+            <span class="text-xs font-mono text-sky-400">POST /inference/churn-risk | GET /compensations</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input id="http-user-id" value="USR_0000042" placeholder="user_id"
+                   class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
+            <input id="http-order-id" value="ORD_0000042" placeholder="order_id"
+                   class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button onclick="httpRunChurnInference()"
+                    class="bg-sky-600 hover:bg-sky-500 text-white font-medium py-2 px-3 rounded-lg text-xs transition">
+              POST: Оценить риск оттока и выдать ваучер
+            </button>
+            <button onclick="httpGetCompensations()"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-3 rounded-lg text-xs transition">
+              GET: История компенсаций клиента
+            </button>
+          </div>
+          <pre id="http-customer-output" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-emerald-300 max-h-40 overflow-auto">Ожидание HTTP-запроса...</pre>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex justify-between items-center">
+            <span class="text-sm font-semibold text-white">Network Topology & Node Health</span>
+            <span class="text-xs font-mono text-purple-400">GET /nodes/capacities | GET /health-passport</span>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <input id="http-node-id" value="HUB_001" placeholder="node_id (HUB_001)"
+                   class="flex-1 min-w-[140px] bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
+            <button onclick="httpGetNodePassport()"
+                    class="bg-purple-600 hover:bg-purple-500 text-white font-medium px-4 py-2 rounded-lg text-xs transition">
+              GET: Паспорт узла (Z-Score)
+            </button>
+            <button onclick="httpGetBlockedCapacities()"
+                    class="bg-fuchsia-700 hover:bg-fuchsia-600 text-white font-medium px-4 py-2 rounded-lg text-xs transition">
+              GET: Все заблокированные узлы
+            </button>
+          </div>
+          <pre id="http-topology-output" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-purple-200 max-h-40 overflow-auto">Ожидание HTTP-запроса...</pre>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex flex-wrap justify-between items-center gap-2">
+            <div>
+              <span class="text-sm font-semibold text-white">Logistics Incidents</span>
+              <div class="text-xs font-mono text-amber-400">GET /logistics/incidents/active | POST /reroute</div>
+            </div>
+            <button onclick="httpLoadActiveIncidents()"
+                    class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">
+              Обновить список по HTTP GET
+            </button>
+          </div>
+          <div class="overflow-x-auto max-h-52 overflow-y-auto border border-slate-800 rounded-lg">
+            <table class="w-full text-left text-xs">
+              <thead class="uppercase text-slate-400 bg-slate-950 border-b border-slate-800">
+                <tr>
+                  <th class="py-2 px-3">Order ID</th>
+                  <th class="py-2 px-3">Узел</th>
+                  <th class="py-2 px-3">Задержка</th>
+                  <th class="py-2 px-3">Статус</th>
+                  <th class="py-2 px-3">HTTP Команда</th>
+                </tr>
+              </thead>
+              <tbody id="http-incidents-tbody" class="divide-y divide-slate-800">
+                <tr><td colspan="5" class="py-3 text-center text-slate-500">Нажмите «Обновить список по HTTP GET»</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <pre id="http-reroute-output" class="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-amber-300 overflow-x-auto">Результат HTTP POST /reroute появится здесь...</pre>
+        </div>
+      </div>
+
+      <div class="xl:col-span-5 space-y-5 bg-slate-900/50 border border-emerald-900/40 rounded-2xl p-5 flex flex-col">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h2 class="text-lg font-bold text-emerald-400">2. WebSocket Live Stream</h2>
+            <span class="text-xs font-mono text-slate-400">ws://.../api/v1/ws/control-tower</span>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="connectWS()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-2.5 py-1 rounded text-xs">
+              Connect
+            </button>
+            <button onclick="disconnectWS()" class="bg-rose-800 hover:bg-rose-700 text-white px-2.5 py-1 rounded text-xs">
+              Disconnect
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-300">Live Инциденты (Auto-Push 3s)</span>
+            <span id="ws-last-tick" class="text-xs text-slate-500">—</span>
+          </div>
+          <div class="overflow-x-auto max-h-48 overflow-y-auto border border-slate-800 rounded-lg">
+            <table class="w-full text-left text-xs">
+              <thead class="uppercase text-slate-400 bg-slate-950 border-b border-slate-800">
+                <tr>
+                  <th class="py-2 px-2.5">Order ID</th>
+                  <th class="py-2 px-2.5">Узел</th>
+                  <th class="py-2 px-2.5">Задержка</th>
+                  <th class="py-2 px-2.5">Статус</th>
+                </tr>
+              </thead>
+              <tbody id="ws-incidents-tbody" class="divide-y divide-slate-800">
+                <tr><td colspan="4" class="py-3 text-center text-slate-500">Ожидание фрейма WebSocket...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+          <span class="text-xs font-semibold uppercase tracking-wider text-rose-300">Live Заблокированные узлы</span>
+          <div id="ws-nodes-box" class="grid grid-cols-2 gap-2 text-xs">
+            <div class="text-slate-500 col-span-2">Ожидание данных топологии...</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Входящие WebSocket-сообщения</h3>
+          <div id="ws-event-log" class="space-y-1.5 text-xs font-mono text-emerald-200 max-h-52 overflow-y-auto bg-slate-950 p-3 rounded-lg border border-slate-800 flex-1"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = `${window.location.origin}/api/v1`;
+    const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/v1/ws/control-tower`;
+    let activeSocket = null;
+    let jwtToken = localStorage.getItem('rtc_jwt') || '';
+    async function doLogin(silent = false) {
+      const b = document.getElementById('auth-badge');
+      try {
+        const r = await _origFetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            username: document.getElementById('auth-u').value,
+            password: document.getElementById('auth-p').value
+          })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || r.status);
+        jwtToken = d.access_token;
+        localStorage.setItem('rtc_jwt', jwtToken);
+        b.textContent = 'AUTH: OK';
+        b.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+      } catch (e) {
+        b.textContent = 'AUTH: ERR';
+        if (!silent) alert(e.message);
+      }
+    }
+    const _origFetch = window.fetch.bind(window);
+    window.fetch = async (url, opts = {}) => {
+      opts.headers = {...(opts.headers || {}), ...(jwtToken ? {'Authorization': `Bearer ${jwtToken}`} : {})};
+      let res = await _origFetch(url, opts);
+      if (res.status === 401 && !String(url).includes('/auth/login')) {
+        await doLogin(true);
+        opts.headers['Authorization'] = `Bearer ${jwtToken}`;
+        res = await _origFetch(url, opts);
+      }
+      return res;
+    };
+    doLogin(true).then(() => httpLoadActiveIncidents());
+
+
+    async function httpRunChurnInference() {
+      const userId = document.getElementById('http-user-id').value;
+      const orderId = document.getElementById('http-order-id').value;
+      const out = document.getElementById('http-customer-output');
+      out.textContent = 'HTTP POST /inference/churn-risk -> ожидание...';
+      const resp = await fetch(`${API_BASE}/inference/churn-risk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': `ui-${orderId}-${Date.now()}` },
+        body: JSON.stringify({ user_id: userId, order_id: orderId })
+      });
+      out.textContent = JSON.stringify(await resp.json(), null, 2);
+    }
+
+    async function httpGetCompensations() {
+      const userId = document.getElementById('http-user-id').value;
+      const out = document.getElementById('http-customer-output');
+      const resp = await fetch(`${API_BASE}/customer/${userId}/compensations`);
+      out.textContent = JSON.stringify(await resp.json(), null, 2);
+    }
+
+    async function httpGetNodePassport() {
+      const nodeId = document.getElementById('http-node-id').value;
+      const out = document.getElementById('http-topology-output');
+      const resp = await fetch(`${API_BASE}/topology/nodes/${nodeId}/health-passport`);
+      out.textContent = JSON.stringify(await resp.json(), null, 2);
+    }
+
+    async function httpGetBlockedCapacities() {
+      const out = document.getElementById('http-topology-output');
+      const resp = await fetch(`${API_BASE}/topology/nodes/capacities`);
+      out.textContent = JSON.stringify(await resp.json(), null, 2);
+    }
+
+    async function httpLoadActiveIncidents() {
+      const tbody = document.getElementById('http-incidents-tbody');
+      const resp = await fetch(`${API_BASE}/logistics/incidents/active?limit=25`);
+      const data = await resp.json();
+      const list = data.incidents || [];
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-3 text-center text-slate-500">Нет активных инцидентов</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(inc => `
+        <tr>
+          <td class="py-2 px-3 font-mono text-sky-300">${inc.order_id}</td>
+          <td class="py-2 px-3">${inc.failing_node_id}</td>
+          <td class="py-2 px-3 text-rose-400 font-bold">${Number(inc.calculated_delay_minutes).toFixed(1)} м</td>
+          <td class="py-2 px-3">${inc.incident_status}</td>
+          <td class="py-2 px-3">
+            ${inc.incident_id && inc.incident_status === 'RAISED'
+              ? `<button onclick="httpRerouteIncident('${inc.incident_id}')" class="bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs">POST Reroute</button>`
+              : '<span class="text-slate-500">—</span>'}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function httpRerouteIncident(incidentId) {
+      const out = document.getElementById('http-reroute-output');
+      const resp = await fetch(`${API_BASE}/logistics/incidents/${incidentId}/reroute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': `reroute-${incidentId}` },
+        body: JSON.stringify({ assigned_team: 'DISPATCH_NIGHT_SHIFT', bypass_hub_id: 'HUB_005' })
+      });
+      out.textContent = JSON.stringify(await resp.json(), null, 2);
+      await httpLoadActiveIncidents();
+    }
+
+    function appendWsLog(text) {
+      const box = document.getElementById('ws-event-log');
+      const item = document.createElement('div');
+      item.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+      box.prepend(item);
+    }
+
+    function connectWS() {
+      if (activeSocket && activeSocket.readyState === WebSocket.OPEN) return;
+      const badge = document.getElementById('ws-badge');
+      activeSocket = new WebSocket(WS_URL);
+
+      activeSocket.onopen = () => {
+        badge.textContent = 'WS: CONNECTED (LIVE)';
+        badge.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        appendWsLog('Соединение установлено с /api/v1/ws/control-tower');
+      };
+
+      activeSocket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'TELEMETRY_SNAPSHOT') {
+          document.getElementById('ws-last-tick').textContent = new Date().toLocaleTimeString();
+          renderWsIncidents(msg.incidents || []);
+          renderWsNodes(msg.restricted_nodes || []);
+          appendWsLog(`SNAPSHOT: incidents=${(msg.incidents || []).length}, blocked_nodes=${(msg.restricted_nodes || []).length}`);
+        } else if (msg.type === 'INCIDENT_REROUTED') {
+          appendWsLog(`EVENT [INCIDENT_REROUTED]: order=${msg.data.order_id} -> bypass=${msg.data.bypass_hub_id}`);
+        }
+      };
+
+      activeSocket.onclose = () => {
+        badge.textContent = 'WS: DISCONNECTED';
+        badge.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+        appendWsLog('Соединение закрыто');
+      };
+    }
+
+    function disconnectWS() {
+      if (activeSocket) {
+        activeSocket.close();
+        activeSocket = null;
+      }
+    }
+
+    function renderWsIncidents(list) {
+      const tbody = document.getElementById('ws-incidents-tbody');
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="py-3 text-center text-slate-500">Нет активных инцидентов</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(inc => `
+        <tr>
+          <td class="py-1.5 px-2.5 font-mono text-emerald-300">${inc.order_id}</td>
+          <td class="py-1.5 px-2.5">${inc.failing_node_id}</td>
+          <td class="py-1.5 px-2.5 text-rose-400 font-semibold">${Number(inc.calculated_delay_minutes).toFixed(1)} м</td>
+          <td class="py-1.5 px-2.5">${inc.incident_status}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderWsNodes(nodes) {
+      const box = document.getElementById('ws-nodes-box');
+      if (nodes.length === 0) {
+        box.innerHTML = '<div class="text-slate-500 col-span-2">Все узлы работают в штатном режиме</div>';
+        return;
+      }
+      box.innerHTML = nodes.map(n => `
+        <div class="bg-slate-950 border border-rose-900/50 rounded-lg p-2">
+          <div class="font-bold text-rose-400">${n.node_id} <span class="text-slate-500 font-normal">(${n.node_type})</span></div>
+          <div class="text-slate-300">Риск: ${Number(n.bottleneck_risk_factor).toFixed(2)} | Емкость: ${n.current_capacity_packages}/${n.base_capacity_packages}</div>
+        </div>
+      `).join('');
+    }
+
+    connectWS();
+  </script>
+</body>
+</html>

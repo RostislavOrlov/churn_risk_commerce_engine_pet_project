@@ -1,0 +1,70 @@
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing, Coverage & Linters
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# ML Models & Training Artifacts (разрешаем только готовые .cbm веса для стенда)
+.models/*
+!.models/*.cbm
+catboost_info/
+mlruns/
+
+# Data Pipelines (dbt, Airflow, Spark)
+data_pipelines/dbt/target/
+data_pipelines/dbt/dbt_packages/
+data_pipelines/dbt/logs/
+data_pipelines/database/seeds/clickhouse/
+data_pipelines/database/seeds/postgresql/
+data_pipelines/database/seeds/elasticsearch/
+data_pipelines/database/seeds/neo4j/
+data_pipelines/database/seeds/catboost_info/
+logs/
+*.log
+spark-warehouse/
+metastore_db/
+derby.log
+
+# IDEs & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

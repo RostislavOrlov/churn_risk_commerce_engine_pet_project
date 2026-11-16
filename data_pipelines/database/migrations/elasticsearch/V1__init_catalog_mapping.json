@@ -1,0 +1,35 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 3,
+      "number_of_replicas": 1
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "product_id": { "type": "keyword" },
+      "base_price": { "type": "double" },
+      "marketing_tags": { "type": "keyword" },
+      "bundle_compatible_ids": { "type": "keyword" },
+      "category_hierarchy": {
+        "properties": {
+          "category_id": { "type": "keyword" },
+          "category_name": { "type": "text" },
+          "level": { "type": "integer" }
+        }
+      },
+      "active_promotions": {
+        "type": "nested",
+        "properties": {
+          "promo_campaign_id": { "type": "keyword" },
+          "start_date": { "type": "date", "format": "yyyy-MM-dd" },
+          "end_date": { "type": "date", "format": "yyyy-MM-dd" },
+          "status": { "type": "keyword" },
+          "discount_type": { "type": "keyword" },
+          "discount_value": { "type": "double" }
+        }
+      }
+    }
+  }
+}

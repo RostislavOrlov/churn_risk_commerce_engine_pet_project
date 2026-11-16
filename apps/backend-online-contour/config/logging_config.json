@@ -1,0 +1,56 @@
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+      "json_formatter": {
+        "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+        "format": "%(asctime)s %(levelname)s %(name)s %(message)s %(process)d %(threadName)s"
+      }
+    },
+    "handlers": {
+      "stdout_handler": {
+        "class": "logging.StreamHandler",
+        "level": "INFO",
+        "formatter": "json_formatter",
+        "stream": "ext://sys.stdout"
+      },
+      "stderr_handler": {
+        "class": "logging.StreamHandler",
+        "level": "ERROR",
+        "formatter": "json_formatter",
+        "stream": "ext://sys.stderr"
+      }
+    },
+    "loggers": {
+      "uvicorn": {
+        "level": "INFO",
+        "handlers": ["stdout_handler"],
+        "propagate": false
+      },
+      "uvicorn.error": {
+        "level": "ERROR",
+        "handlers": ["stderr_handler"],
+        "propagate": false
+      },
+      "uvicorn.access": {
+        "level": "INFO",
+        "handlers": ["stdout_handler"],
+        "propagate": false
+      },
+      "gunicorn.error": {
+        "level": "ERROR",
+        "handlers": ["stderr_handler"],
+        "propagate": false
+      },
+      "gunicorn.access": {
+        "level": "INFO",
+        "handlers": ["stdout_handler"],
+        "propagate": false
+      }
+    },
+    "root": {
+      "level": "INFO",
+      "handlers": ["stdout_handler", "stderr_handler"]
+    }
+  }
+  

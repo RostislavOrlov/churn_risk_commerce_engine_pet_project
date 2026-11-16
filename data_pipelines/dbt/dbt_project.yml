@@ -1,0 +1,47 @@
+name: 'contextual_commerce_dbt'
+version: '2.4.0'
+config-version: 2
+
+profile: 'commerce_mpp_profile'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  contextual_commerce_dbt:
+    
+    staging:
+      +materialized: view
+      +schema: stg_analytics
+      +enabled: true
+
+    greenplum_marts:
+      +materialized: table
+      +schema: dw_marts
+      +enabled: true
+      +storage_parameter: "appendonly=true, orientation=column, compresstype=zstd, compresslevel=3"
+      
+      user_ltv_at_risk:
+        +materialized: incremental
+        +incremental_strategy: delete+insert
+
+    clickhouse_marts:
+      +materialized: incremental
+      +schema: s2_analytics
+      +enabled: true
+      +engine: 'ReplacingMergeTree(version)'
+      +settings:
+        max_bytes_before_external_group_by: 34359738368
+        max_bytes_before_external_sort: 17179869184
+
+tests:
+  +store_failures: true  
+  +severity: error       

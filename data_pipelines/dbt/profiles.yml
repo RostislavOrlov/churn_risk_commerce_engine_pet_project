@@ -1,0 +1,11 @@
+commerce_mpp_profile:
+  target: dev
+  outputs:
+    dev:
+      type: clickhouse
+      schema: default
+      host: clickhouse
+      port: 8123
+      user: clickhouse_user
+      password: clickhouse_password
+      secure: False

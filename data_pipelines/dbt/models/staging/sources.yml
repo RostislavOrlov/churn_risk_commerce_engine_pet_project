@@ -1,0 +1,27 @@
+version: 2
+
+sources:
+  - name: s2_clickstream
+    schema: default
+    tables:
+      - name: user_clicks
+
+  - name: default
+    schema: default
+    tables:
+      - name: user_clicks
+
+  - name: s2_telemetry
+    schema: s2_telemetry
+    tables:
+      - name: web_performance_logs
+
+  - name: s2_analytics
+    schema: s2_analytics
+    tables:
+      - name: search_funnel_logs
+
+  - name: s2_shipping
+    schema: s2_shipping
+    tables:
+      - name: clickstream_scan_events

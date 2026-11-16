@@ -1,0 +1,425 @@
+version: '3.8'
+
+networks:
+  retail_network:
+    driver: bridge
+
+services:
+  postgres-master:
+    image: timescale/timescaledb:latest-pg15
+    container_name: retail_postgres_master
+    environment:
+      POSTGRES_USER: retail_user
+      POSTGRES_PASSWORD: retail_password
+      POSTGRES_DB: retail_oltp
+    command: >
+      postgres
+      -c wal_level=logical
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c hot_standby=on
+      -c hba_file=/etc/postgresql/pg_hba.conf
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_master_data:/var/lib/postgresql/data
+      - ./postgresql/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgresql/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+    networks:
+      - retail_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retail_user -d retail_oltp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-replica-1:
+    image: timescale/timescaledb:latest-pg15
+    container_name: retail_postgres_replica_1
+    environment:
+      POSTGRES_USER: retail_user
+      POSTGRES_PASSWORD: retail_password
+      POSTGRES_DB: retail_oltp
+      PGPASSWORD: retail_password
+    user: postgres
+    command: >
+      bash -c "
+      until pg_isready -h postgres-master -U retail_user -d retail_oltp; do echo 'Waiting for master...'; sleep 1; done;
+      if [ -z \"$$(ls -A /var/lib/postgresql/data)\" ]; then
+        pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U retail_user -Fp -Xs -P -R;
+      fi;
+      chmod 0700 /var/lib/postgresql/data;
+      exec postgres -c hot_standby=on"
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_replica1_data:/var/lib/postgresql/data
+    networks:
+      - retail_network
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+    restart: unless-stopped
+  
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: ch_shard1_replica1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: retail_olap
+      CLICKHOUSE_USER: clickhouse_user
+      CLICKHOUSE_PASSWORD: clickhouse_password
+    volumes:
+    - ch_s1_r1_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - retail_network
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    restart: unless-stopped
+
+  spark-master:
+    image: apache/spark:3.4.1
+    container_name: retail_spark_master
+    command: /opt/spark/sbin/start-master.sh
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      - SPARK_MASTER_PORT=7077
+      - SPARK_MASTER_WEBUI_PORT=8080
+      - SPARK_NO_DAEMONIZE=true
+    networks:
+      - retail_network
+    restart: unless-stopped
+
+  spark-worker-1:
+    image: apache/spark:3.4.1
+    container_name: retail_spark_worker_1
+    command: /opt/spark/sbin/start-worker.sh spark://spark-master:7077
+    environment:
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_DAEMON_MEMORY=512m
+      - SPARK_WORKER_WEBUI_PORT=8081
+      - SPARK_NO_DAEMONIZE=true
+    ports:
+      - "8081:8081"
+    volumes:
+      - ..:/opt/pipelines/data_pipelines
+      - spark_checkpoints:/opt/spark/work-dir/checkpoints
+    networks:
+      - retail_network
+    depends_on:
+      - spark-master
+    restart: unless-stopped
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: retail_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - retail_network
+    healthcheck:
+      test: ["CMD-SHELL", "echo stat | nc localhost 2181"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: retail_kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "19092:19092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://retail_kafka:9092,EXTERNAL://localhost:19092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - retail_network
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  airflow:
+    build:
+      context: .
+      dockerfile: airflow.Dockerfile
+    container_name: retail_airflow
+    command: standalone
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://retail_user:retail_password@postgres-master:5432/airflow_db
+      - AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE=False
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW_CONN_POSTGRES_ANALYTICS_DW=postgresql://retail_user:retail_password@postgres-master:5432/retail_oltp
+      - 'AIRFLOW_CONN_SPARK_DEFAULT={"conn_type": "spark", "host": "spark://spark-master", "port": 7077}'
+      
+    volumes:
+      - ../airflow/dags:/opt/airflow/dags 
+      - ..:/opt/airflow/data_pipelines
+    ports:
+      - "8089:8080"
+    networks:
+      - retail_network
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j
+    container_name: ecom_neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: "neo4j/secure_graph_pass_99"
+      NEO4J_PLUGINS: '["apoc", "graph-data-science"]'
+      NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*,streams.*"
+      NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*,streams.*"
+
+      NEO4J_server_config_strict__validation_enabled: "false"
+
+      NEO4J_streams_sink_enabled: "true"
+      NEO4J_kafka_bootstrap_servers: "kafka:9092"
+      NEO4J_kafka_auto_offset_reset: "earliest"
+      NEO4J_kafka_group_id: "neo4j_topology_sink_group"
+
+      NEO4J_streams_sink_topic_cypher_delivery_orders_stream: "file:///sink_delivery_orders.cypher"
+      NEO4J_streams_sink_topic_cypher_order_items_stream: "file:///sink_order_items.cypher"
+
+      NEO4J_server_memory_heap_initial__size: "1G"
+      NEO4J_server_memory_heap_max__size: "2G"
+      NEO4J_dbms_memory_transaction_total_max: "0"
+
+    volumes:
+      - neo4j_data_volume:/data
+      - neo4j_logs_volume:/logs
+      - ../jobs/stochastic_logistics_tracking/queries/neo4j:/var/lib/neo4j/import
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p secure_graph_pass_99 'RETURN 1;' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    networks:
+      - retail_network
+    restart: unless-stopped
+
+  redis:
+    image: redis
+    container_name: ecom_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - retail_network
+    restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: ecom_elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    deploy:
+      resources:
+        limits:
+          memory: 1536m
+        reservations:
+          memory: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    networks:
+      - retail_network
+    restart: unless-stopped
+
+  db-init-orchestrator:
+    build:
+      context: ../../
+      dockerfile: data_pipelines/deploy/db_init.Dockerfile 
+    container_name: retail_db_init_orchestrator
+    user: "0:0"
+    entrypoint: ["/bin/bash", "/opt/pipelines/data_pipelines/database/seeds/entrypoint_init.sh"]
+    environment:
+      - PYTHONPATH=/opt/pipelines
+    volumes:
+      - ../../:/opt/pipelines
+      - ../../data_pipelines/migrations/clickhouse:/opt/migrations
+    networks:
+      - retail_network
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+
+  pushgateway:
+    image: prom/pushgateway:v1.9.0
+    container_name: retail_pushgateway
+    ports:
+      - "9091:9091"
+    networks:
+      - retail_network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: retail_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    depends_on:
+      - pushgateway
+    networks:
+      - retail_network
+    restart: unless-stopped
+
+
+  airflow-dag-bootstrap:
+    build:
+      context: .
+      dockerfile: airflow.Dockerfile
+    container_name: retail_airflow_dag_bootstrap
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://retail_user:retail_password@postgres-master:5432/airflow_db
+      - AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE=False
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW_CONN_POSTGRES_ANALYTICS_DW=postgresql://retail_user:retail_password@postgres-master:5432/retail_oltp
+      - 'AIRFLOW_CONN_SPARK_DEFAULT={"conn_type": "spark", "host": "spark://spark-master", "port": 7077}'
+    volumes:
+      - ../airflow/dags:/opt/airflow/dags:ro
+      - ..:/opt/airflow/data_pipelines:ro
+    networks:
+      - retail_network
+    depends_on:
+      airflow:
+        condition: service_started
+      db-init-orchestrator:
+        condition: service_completed_successfully
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        echo "[BOOTSTRAP] Ожидание инициализации метабазы Airflow и регистрации master_bootstrap_pipeline..."
+        until airflow dags list 2>/dev/null | grep -q "master_bootstrap_pipeline"; do
+          sleep 5
+        done
+
+        echo "[BOOTSTRAP] Снимаем с паузы и запускаем master_bootstrap_pipeline..."
+        airflow dags unpause master_bootstrap_pipeline >/dev/null
+        airflow dags trigger master_bootstrap_pipeline >/dev/null
+
+        python3 -u << 'EOF'
+        import sys
+        import time
+        from airflow.models import DagRun, TaskInstance
+        from airflow.utils.session import create_session
+
+        last_snapshot = ""
+
+        while True:
+            with create_session() as session:
+                session.expire_all()
+                dr = (
+                    session.query(DagRun)
+                    .filter(DagRun.dag_id == "master_bootstrap_pipeline")
+                    .order_by(DagRun.execution_date.desc())
+                    .first()
+                )
+
+                if not dr:
+                    time.sleep(2)
+                    continue
+
+                tis = (
+                    session.query(TaskInstance)
+                    .filter(
+                        TaskInstance.dag_id == "master_bootstrap_pipeline",
+                        TaskInstance.run_id == dr.run_id,
+                    )
+                    .order_by(TaskInstance.task_id)
+                    .all()
+                )
+
+                lines = [
+                    f"  - {t.task_id:<40} : {(t.state or 'scheduled').upper()}"
+                    for t in tis
+                ]
+                dr_state = (dr.state or "").upper()
+                snapshot = f"RUN_ID={dr.run_id} | DAG_STATE={dr_state}\n" + "\n".join(lines)
+
+                if snapshot != last_snapshot:
+                    now_str = time.strftime("%H:%M:%S")
+                    print(f"\n[BOOTSTRAP {now_str}] {snapshot}", flush=True)
+                    last_snapshot = snapshot
+
+                if dr.state == "success":
+                    print("\n[BOOTSTRAP] ВСЕ ТАСКИ ЗАВЕРШЕНЫ УСПЕШНО (SUCCESS)!", flush=True)
+                    sys.exit(0)
+                elif dr.state == "failed":
+                    print("\n[BOOTSTRAP][ERROR] ПАЙПЛАЙН УПАЛ (FAILED)! Проверьте логи в Airflow UI (http://localhost:8089).", flush=True)
+                    sys.exit(1)
+
+            time.sleep(3)
+        EOF
+    restart: "no"
+
+volumes:
+  pg_master_data:
+  pg_replica1_data:
+  pg_replica2_data:
+  pg_replica3_data:
+  ch_s1_r1_data:
+  ch_s1_r2_data:
+  ch_s2_r1_data:
+  ch_s2_r2_data:
+  spark_checkpoints:
+  neo4j_data_volume:
+    driver: local
+  neo4j_logs_volume:
+    driver: local

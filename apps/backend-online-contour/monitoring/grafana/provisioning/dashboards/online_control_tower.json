@@ -1,0 +1,127 @@
+{
+    "annotations": { "list": [] },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "liveNow": true,
+    "panels": [
+      {
+        "datasource": { "type": "prometheus", "uid": "PrometheusOnline" },
+        "fieldConfig": {
+          "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "id": 1,
+        "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+        "targets": [
+          {
+            "expr": "sum(rate(rtc_online_http_requests_total[30s])) by (endpoint, status_code)",
+            "legendFormat": "{{endpoint}} [{{status_code}}]"
+          }
+        ],
+        "title": "1. HTTP Throughput (RPS by Endpoint)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "PrometheusOnline" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.035 },
+                { "color": "red", "value": 0.05 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "id": 2,
+        "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(rtc_online_http_request_duration_seconds_bucket[30s])) by (le, endpoint))",
+            "legendFormat": "p95 {{endpoint}}"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(rtc_online_http_request_duration_seconds_bucket[30s])) by (le))",
+            "legendFormat": "p99 Global"
+          }
+        ],
+        "title": "2. API Latency (p95 & p99 SLA <= 50ms)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "PrometheusOnline" },
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              { "options": { "0": { "color": "green", "text": "0 - CLOSED (OK)" } }, "type": "value" },
+              { "options": { "1": { "color": "yellow", "text": "1 - HALF-OPEN" } }, "type": "value" },
+              { "options": { "2": { "color": "red", "text": "2 - OPEN (ISOLATED)" } }, "type": "value" }
+            ],
+            "max": 2,
+            "min": 0
+          }
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+        "id": 3,
+        "targets": [
+          {
+            "expr": "rtc_online_circuit_breaker_state",
+            "legendFormat": "{{datastore}}"
+          }
+        ],
+        "title": "3. Circuit Breaker States",
+        "type": "stat"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "PrometheusOnline" },
+        "fieldConfig": {
+          "defaults": { "color": { "mode": "palette-classic" }, "unit": "s" }
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+        "id": 4,
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(rtc_online_ml_inference_duration_seconds_bucket[30s])) by (le, degraded_mode))",
+            "legendFormat": "CatBoost p50 (degraded={{degraded_mode}})"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(rtc_online_ml_inference_duration_seconds_bucket[30s])) by (le, degraded_mode))",
+            "legendFormat": "CatBoost p95 (degraded={{degraded_mode}})"
+          }
+        ],
+        "title": "4. CatBoost ML Inference Duration",
+        "type": "timeseries"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "PrometheusOnline" },
+        "fieldConfig": {
+          "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" }
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+        "id": 5,
+        "targets": [
+          {
+            "expr": "sum(rate(rtc_online_cache_operations_total[30s])) by (layer, result)",
+            "legendFormat": "{{layer}} - {{result}}"
+          }
+        ],
+        "title": "5. Hybrid Cache Operations (L1/L2 HIT vs MISS)",
+        "type": "timeseries"
+      }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 39,
+    "tags": ["realtime-commerce", "mlops", "fastapi"],
+    "time": { "from": "now-15m", "to": "now" },
+    "title": "Real-Time Commerce Control Tower — Online Contour",
+    "uid": "rtc-online-contour-v1"
+  }
+  

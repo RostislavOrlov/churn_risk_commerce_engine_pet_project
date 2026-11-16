@@ -1,0 +1,215 @@
+version: "3.8"
+
+networks:
+  retail_network:
+    driver: bridge
+
+services:
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: retail_keycloak
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8090:8080"
+    volumes:
+      - ../../apps/backend-online-contour/keycloak:/opt/keycloak/data/import:ro
+    networks:
+      - retail_network
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080; echo -e 'GET /realms/retail-tech HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  debezium-connect:
+    build:
+      context: ../../apps/backend-online-contour/cdc
+      dockerfile: debezium-connect.Dockerfile
+    container_name: retail_debezium_connect
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: "kafka:9092"
+      GROUP_ID: "1"
+      CONFIG_STORAGE_TOPIC: "debezium_connect_configs"
+      OFFSET_STORAGE_TOPIC: "debezium_connect_offsets"
+      STATUS_STORAGE_TOPIC: "debezium_connect_statuses"
+      CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    networks:
+      - retail_network
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      db-init-orchestrator:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 45s
+    restart: unless-stopped
+
+  debezium-connector-init:
+    image: curlimages/curl:8.10.1
+    container_name: retail_debezium_init
+    volumes:
+      - ../../apps/backend-online-contour/cdc:/cdc:ro
+    networks:
+      - retail_network
+    depends_on:
+      debezium-connect:
+        condition: service_healthy
+      db-init-orchestrator:
+        condition: service_completed_successfully
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "Waiting for Debezium Connect REST API..."
+        until curl -sf http://debezium-connect:8083/connectors > /dev/null; do
+          sleep 2
+        done
+        echo "Registering Debezium PostgreSQL CDC connector..."
+        curl -i -s -X POST http://debezium-connect:8083/connectors \
+          -H "Content-Type: application/json" \
+          -d @/cdc/postgres-orders-connector.json
+        echo ""
+        echo "Registering Neo4j Kafka Sink connector..."
+        curl -i -s -X POST http://debezium-connect:8083/connectors \
+          -H "Content-Type: application/json" \
+          -d @/cdc/neo4j-sink-connector.json
+        echo ""
+        echo "All connectors registration finished."
+    restart: "no"
+
+  backend-online-contour:
+    build:
+      context: ../../apps/backend-online-contour
+      dockerfile: Dockerfile
+    container_name: retail_online_api
+    ports:
+      - "8000:8080"
+    environment:
+      ENV: "production"
+      PROJECT_NAME: "RealTimeCommerce-Online-Engine"
+      API_V1_STR: "/api/v1"
+      HTTP_HOST: "0.0.0.0"
+      HTTP_PORT: "8080"
+      WORKERS_COUNT: "4"
+      POSTGRES_MASTER_DSN: "postgresql+asyncpg://retail_user:retail_password@postgres-master:5432/retail_oltp"
+      POSTGRES_REPLICA_DSN: "postgresql+asyncpg://retail_user:retail_password@postgres-replica-1:5432/retail_oltp"
+      REDIS_URL: "redis://redis:6379/0"
+      REDIS_TIMEOUT_SEC: "0.5"
+      CELERY_BROKER_URL: "redis://redis:6379/1"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+      NEO4J_URI: "bolt://neo4j:7687"
+      NEO4J_USER: "neo4j"
+      NEO4J_PASSWORD: "secure_graph_pass_99"
+      NEO4J_TIMEOUT_SEC: "1.5"
+      KEYCLOAK_SERVER_URL: "http://keycloak:8080"
+      KEYCLOAK_REALM: "retail-tech"
+      KEYCLOAK_CLIENT_ID: "recommendation-api-service"
+      KEYCLOAK_CLIENT_SECRET: "retail-online-secret-2026"
+      CATBOOST_MODEL_PATH: "/app/.models/user_churn_retail_v2.cbm"
+      CATBOOST_SHADOW_MODEL_PATH: "/app/.models/user_churn_retail_challenger.cbm"
+      AUTH_ENABLED: "True"
+    volumes:
+      - ../../.models:/app/.models:ro
+    networks:
+      - retail_network
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+      airflow-dag-bootstrap: 
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  online-celery-worker:
+    build:
+      context: ../../apps/backend-online-contour
+      dockerfile: Dockerfile
+    container_name: retail_online_celery_worker
+    command: celery -A src.tasks.celery_app worker --loglevel=info --concurrency=4 -Q default,critical_ops
+    environment:
+      POSTGRES_MASTER_DSN: "postgresql+asyncpg://retail_user:retail_password@postgres-master:5432/retail_oltp"
+      POSTGRES_REPLICA_DSN: "postgresql+asyncpg://retail_user:retail_password@postgres-replica-1:5432/retail_oltp"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/1"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+      KEYCLOAK_SERVER_URL: "http://keycloak:8080"
+      KEYCLOAK_REALM: "retail-tech"
+      KEYCLOAK_CLIENT_ID: "recommendation-api-service"
+      KEYCLOAK_CLIENT_SECRET: "retail-online-secret-2026"
+      AUTH_ENABLED: "True"
+    networks:
+      - retail_network
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+
+  online-prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: retail_online_prometheus
+    ports:
+      - "9092:9090"
+    volumes:
+      - ../../apps/backend-online-contour/monitoring/prometheus.online.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=2d"
+    networks:
+      - retail_network
+    depends_on:
+      backend-online-contour:
+        condition: service_started
+    restart: unless-stopped
+
+  online-grafana:
+    image: grafana/grafana:11.1.0
+    container_name: retail_online_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ../../apps/backend-online-contour/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - retail_network
+    depends_on:
+      online-prometheus:
+        condition: service_started
+    restart: unless-stopped

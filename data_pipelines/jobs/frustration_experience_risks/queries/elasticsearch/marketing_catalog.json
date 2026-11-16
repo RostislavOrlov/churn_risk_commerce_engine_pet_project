@@ -1,0 +1,51 @@
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "terms": {
+            "_id": "$target_product_ids"
+          }
+        }
+      ],
+      "should": [
+        {
+          "nested": {
+            "path": "active_promotions",
+            "query": {
+              "bool": {
+                "must": [
+                  { "range": { "active_promotions.start_date": { "lte": "$target_date" } } },
+                  { "range": { "active_promotions.end_date": { "gte": "$target_date" } } },
+                  { "term": { "active_promotions.status": "ACTIVE" } }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "script_fields": {
+    "dynamic_promo_price": {
+      "script": {
+        "lang": "painless",
+        "source": "double base_price = doc['base_price'].size() > 0 ? doc['base_price'].value : 0.0; double max_discount_pct = 0.0; double fixed_discount = 0.0; if (params.containsKey('_source') && params['_source'] != null && params['_source'].active_promotions != null) { for (item in params['_source'].active_promotions) { if (item.status == 'ACTIVE' && item.start_date != null && item.end_date != null && item.start_date.compareTo(params.target_date) <= 0 && item.end_date.compareTo(params.target_date) >= 0) { if (item.discount_type == 'PERCENTAGE' && item.discount_value > max_discount_pct) { max_discount_pct = item.discount_value; } else if (item.discount_type == 'FIXED' && item.discount_value > fixed_discount) { fixed_discount = item.discount_value; } } } } double final_price = base_price * (1.0 - (max_discount_pct / 100.0)) - fixed_discount; return final_price > 0 ? final_price : base_price * 0.1;",
+        "params": {
+          "target_date": "$target_date"
+        }
+      }
+    }
+  },
+  "_source": [
+    "product_id",
+    "base_price",
+    "category_hierarchy.category_id",
+    "category_hierarchy.category_name",
+    "category_hierarchy.level",
+    "marketing_tags",
+    "bundle_compatible_ids",
+    "active_promotions.promo_campaign_id"
+  ],
+  "size": "$size"
+}

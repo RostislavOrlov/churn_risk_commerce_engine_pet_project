@@ -1,0 +1,29 @@
+{
+    "name": "retail-postgres-orders-cdc",
+    "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+      "tasks.max": "1",
+      "database.hostname": "postgres-master",
+      "database.port": "5432",
+      "database.user": "retail_user",
+      "database.password": "retail_password",
+      "database.dbname": "retail_oltp",
+      "topic.prefix": "cdc_oltp",
+      "plugin.name": "pgoutput",
+      "slot.name": "debezium_orders_slot_v2",
+      "publication.name": "dbz_publication_v2",
+      "publication.autocreate.mode": "filtered",
+      "table.include.list": "public.orders",
+      "tombstones.on.delete": "false",
+  
+      "transforms": "unwrap,reroute",
+      "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+      "transforms.unwrap.drop.tombstones": "true",
+      "transforms.unwrap.delete.handling.mode": "drop",
+  
+      "transforms.reroute.type": "org.apache.kafka.connect.transforms.RegexRouter",
+      "transforms.reroute.regex": "cdc_oltp\\.public\\.orders",
+      "transforms.reroute.replacement": "delivery_orders_stream"
+    }
+  }
+  

@@ -1,0 +1,19 @@
+{
+    "name": "retail-neo4j-orders-sink-v3",
+    "config": {
+      "connector.class": "org.neo4j.connectors.kafka.sink.Neo4jConnector",
+      "tasks.max": "1",
+      "topics": "delivery_orders_stream,order_items_stream",
+      "neo4j.uri": "bolt://neo4j:7687",
+      "neo4j.authentication.basic.username": "neo4j",
+      "neo4j.authentication.basic.password": "secure_graph_pass_99",
+      "neo4j.database": "neo4j",
+      "neo4j.cypher.topic.delivery_orders_stream": "WITH coalesce(__value.payload, __value) AS row WHERE row.user_id IS NOT NULL AND row.order_id IS NOT NULL MERGE (c:Customer {id: 'CUST_' + row.user_id}) MERGE (o:Order {id: row.order_id}) ON CREATE SET o.amount = toFloat(coalesce(row.amount, 0.0)), o.status = row.status ON MATCH SET o.status = row.status MERGE (c)-[r:PLACED_ORDER]->(o) ON CREATE SET r.created_at = timestamp() ON MATCH SET r.updated_at = timestamp()",
+      "neo4j.cypher.topic.order_items_stream": "WITH coalesce(__value.payload, __value) AS row WHERE row.order_id IS NOT NULL AND row.package_id IS NOT NULL MERGE (o:Order {id: row.order_id}) MERGE (pkg:SKU_Package {id: row.package_id}) ON CREATE SET pkg.type = row.package_type, pkg.weight = toFloat(coalesce(row.weight, 0.0)) MERGE (o)-[r:CONTAINS_PACKAGE]->(pkg) ON MATCH SET r.last_verified_at = timestamp()",
+      "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "key.converter.schemas.enable": "false",
+      "value.converter.schemas.enable": "false"
+    }
+  }
+  

@@ -1,0 +1,135 @@
+{
+    "realm": "retail-tech",
+    "enabled": true,
+    "sslRequired": "none",
+    "registrationAllowed": false,
+    "accessTokenLifespan": 900,
+    "ssoSessionIdleTimeout": 1800,
+    "ssoSessionMaxLifespan": 36000,
+    "roles": {
+      "realm": [
+        {
+          "name": "OPERATOR",
+          "description": "Оператор колл-центра: просмотр компенсаций и запуск ML-скоринга оттока"
+        },
+        {
+          "name": "DISPATCHER",
+          "description": "Диспетчер логистики: мониторинг инцидентов и перемаршрутизация"
+        },
+        {
+          "name": "CRITICAL_OPS",
+          "description": "Критический операционный контур: управление блокировками хабов"
+        },
+        {
+          "name": "ROUTING_ENGINE",
+          "description": "Сервис маршрутизации: чтение пропускных способностей узлов"
+        }
+      ]
+    },
+    "clients": [
+      {
+        "clientId": "recommendation-api-service",
+        "name": "Backend Online Contour API & BFF",
+        "enabled": true,
+        "protocol": "openid-connect",
+        "publicClient": false,
+        "secret": "retail-online-secret-2026",
+        "serviceAccountsEnabled": true,
+        "directAccessGrantsEnabled": true,
+        "standardFlowEnabled": true,
+        "fullScopeAllowed": true
+      },
+      {
+        "clientId": "online-routing-engine-client",
+        "name": "Online Routing Engine M2M Client",
+        "enabled": true,
+        "protocol": "openid-connect",
+        "publicClient": false,
+        "secret": "routing-secret-2026",
+        "serviceAccountsEnabled": true,
+        "directAccessGrantsEnabled": false,
+        "standardFlowEnabled": false,
+        "fullScopeAllowed": true
+      },
+      {
+        "clientId": "crm-callcenter-client",
+        "name": "CRM Callcenter M2M Client",
+        "enabled": true,
+        "protocol": "openid-connect",
+        "publicClient": false,
+        "secret": "crm-secret-2026",
+        "serviceAccountsEnabled": true,
+        "directAccessGrantsEnabled": false,
+        "standardFlowEnabled": false,
+        "fullScopeAllowed": true
+      }
+    ],
+    "users": [
+      {
+        "username": "dispatcher_ivanov",
+        "enabled": true,
+        "emailVerified": true,
+        "firstName": "Алексей",
+        "lastName": "Иванов",
+        "email": "ivanov@retail-tech.local",
+        "credentials": [
+          {
+            "type": "password",
+            "value": "password123",
+            "temporary": false
+          }
+        ],
+        "realmRoles": [
+          "DISPATCHER",
+          "CRITICAL_OPS",
+          "OPERATOR"
+        ]
+      },
+      {
+        "username": "operator_petrova",
+        "enabled": true,
+        "emailVerified": true,
+        "firstName": "Елена",
+        "lastName": "Петрова",
+        "email": "petrova@retail-tech.local",
+        "credentials": [
+          {
+            "type": "password",
+            "value": "password123",
+            "temporary": false
+          }
+        ],
+        "realmRoles": [
+          "OPERATOR"
+        ]
+      },
+      {
+        "username": "service-account-recommendation-api-service",
+        "enabled": true,
+        "serviceAccountClientId": "recommendation-api-service",
+        "realmRoles": [
+          "DISPATCHER",
+          "CRITICAL_OPS",
+          "OPERATOR",
+          "ROUTING_ENGINE"
+        ]
+      },
+      {
+        "username": "service-account-online-routing-engine-client",
+        "enabled": true,
+        "serviceAccountClientId": "online-routing-engine-client",
+        "realmRoles": [
+          "ROUTING_ENGINE"
+        ]
+      },
+      {
+        "username": "service-account-crm-callcenter-client",
+        "enabled": true,
+        "serviceAccountClientId": "crm-callcenter-client",
+        "realmRoles": [
+          "OPERATOR"
+        ]
+      }
+    ]
+  }
+  

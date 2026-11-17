@@ -66,7 +66,7 @@ def main() -> None:
 
     except Exception as fatal_error:
         logger.critical(
-            "Катастрофический сбой рантаймера при инициализации джобы: %s",
+            "Катастрофический сбой рантайма при инициализации процесса обновления графа Neo4j: %s",
             str(fatal_error),
             exc_info=True,
         )

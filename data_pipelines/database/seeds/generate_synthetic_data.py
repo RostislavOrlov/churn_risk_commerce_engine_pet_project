@@ -184,7 +184,7 @@ for idx, p_id in enumerate(product_ids):
 
 with open(os.path.join(SEEDS_DIR, "elasticsearch", "retail_catalog.json"), "w", encoding="utf-8") as f:
     json.dump(es_catalog, f, indent=2, ensure_ascii=False)
-    print("\n[SUCCESS] Успешно завершена генерация сквозных Big Data семян!")
+    print("\n[SUCCESS] Успешно завершена генерация тестовых данных!")
     print(f"Итог контуров: {num_users} пользователей жестко связаны с {num_orders} транзакциями.")
 
 print("[4/4] ГЕНЕРАЦИЯ: Neo4j Graph Layer (1-я и 2-я подзадачи)...")

@@ -19,7 +19,7 @@ wait_for_port "clickhouse" 8123
 wait_for_port "elasticsearch" 9200
 wait_for_port "ecom_neo4j" 7687
 
-echo "[INIT] Шаг 1: Запуск векторизованной генерации сквозных Big Data семян..."
+echo "[INIT] Шаг 1: Запуск генерации тестовых данных..."
 python3 /opt/pipelines/data_pipelines/database/seeds/generate_synthetic_data.py
 
 echo "[INIT] Шаг 2: Накат DDL-схем и пакетная загрузка во ВСЕ СУБД (Postgres, CH, ES, Neo4j)..."

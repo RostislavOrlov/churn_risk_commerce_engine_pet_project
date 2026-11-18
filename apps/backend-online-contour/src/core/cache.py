@@ -1,3 +1,6 @@
+# TODO: Заготовка под двухуровневый кэш (L1 RAM + L2 Redis) при росте нагрузки.
+# Пока используем репозиторий redis_client
+
 import time
 import json
 import hmac
